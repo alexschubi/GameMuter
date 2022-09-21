@@ -7,9 +7,9 @@ using System.Media;
 [DllImport("user32.dll")]
 static extern short GetAsyncKeyState(int ArrowKeys);
 [DllImport("user32.dll")]
-static extern IntPtr SendMessageW(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
-[DllImport("user32.dll")]
 static extern IntPtr SendMessageA(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+[DllImport("user32.dll")]
+static extern IntPtr SendNotifyMessageA(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
 [DllImport("user32.dll")]
 static extern IntPtr PostMessageA(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
 
@@ -47,6 +47,20 @@ try {
     Console.WriteLine(" using 20s");
 }
 
+//CHECK
+async Task audioPlayCheck() {
+    await Task.Run(() =>
+    {
+        while (true) {
+            muted = !IsAudioPlaying();
+            Console.WriteLine($"is muted:{muted}");
+            Task.Delay(5000).Wait();
+        }
+    });
+}
+//audioPlayCheck(); not working
+
+
 //CHECK IF INGAME
 int countdown = timeout;
 IntPtr message = (IntPtr)1;
@@ -64,17 +78,17 @@ void runCheck() {
         } else if (ingame == true) {
             countdown--; 
         }
-        muted = !IsAudioPlaying();//TODO call not every time and it has delay
+        //muted = !IsAudioPlaying();//TODO call not every time and it has delay
         switch ((ingame, muted)) {
             case (true, false): //MUTE
-                Console.Write("Muting...");
-                togglePlayState();
-                Console.WriteLine(" success");
+                Console.WriteLine("Muting...");
+                PostMessageA(hWnd, 0x319, hWnd, (IntPtr)0x2F0000);
+                muted = true;
                 break;
             case (false, true): //PLAY
-                Console.Write("Playing...");
-                togglePlayState();
-                Console.WriteLine(" success");
+                Console.WriteLine("Playing...");
+                PostMessageA(hWnd, 0x319, hWnd, (IntPtr)0x2E0000);
+                muted = false;
                 break;
         }
         //if (message != IntPtr.Zero) { muted = !IsAudioPlaying(); }
@@ -86,18 +100,18 @@ runCheck();
 
 //CONTROL MUTE / PLAY
 void mute() {
-    //SendMessageW((IntPtr)0xffff, 0x319, (IntPtr)0xffff, (IntPtr)0x2F000);
     if (!muted) {
         muted = true;
-        togglePlayState();
+        AppCommand(AppComandCode.MEDIA_PAUSE);
+        //PostMessageA(hWnd, 0x319, hWnd, (IntPtr)0x2F0000);
         Console.WriteLine("Muting");
     }
 }
 void play() {
-    //SendMessageW((IntPtr)0xffff, 0x319, (IntPtr)0xffff, (IntPtr)0x2E000);
     if (muted) {
         muted = false;
-        togglePlayState();
+        AppCommand(AppComandCode.MEDIA_PLAY);
+        //PostMessageA(hWnd, 0x319, hWnd, (IntPtr)0x2E0000);
         Console.WriteLine("Playing");
     }
 }
@@ -133,7 +147,8 @@ bool IsAudioPlaying() {
 int WM_APPCOMMAND = 0x0319;
 void AppCommand(AppComandCode commandCode) {
     int CommandID = (int)commandCode << 16;
-    SendMessageW(hWnd, WM_APPCOMMAND, hWnd, (IntPtr)CommandID);
+    PostMessageA(hWnd, WM_APPCOMMAND, hWnd, (IntPtr)CommandID);
+    //PostMessageA(hWnd, WM_APPCOMMAND, hWnd, (IntPtr)commandCode); //not working
 }
 enum AppComandCode : uint {
     BASS_BOOST = 20,
@@ -175,6 +190,7 @@ enum AppComandCode : uint {
     MEDIA_FASTFORWARD = 49,
     MEDIA_PAUSE = 47,
     MEDIA_PLAY = 46,
+  
     MEDIA_RECORD = 48,
     MEDIA_REWIND = 50,
     MIC_ON_OFF_TOGGLE = 44,
